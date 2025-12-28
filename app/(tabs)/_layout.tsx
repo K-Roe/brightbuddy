@@ -1,33 +1,76 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+<Tabs
+  screenOptions={{
+    headerShown: false,
+    tabBarStyle: {
+      height: 80,
+      backgroundColor: "#141a29",
+      paddingBottom: 10,
+      paddingTop: 5,
+      borderTopWidth: 0,
+    },
+    tabBarLabelStyle: {
+      fontSize: 12,
+      fontWeight: "bold",
+    },
+  }}
+>
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home" size={28} color={color} />
+          ),
+          tabBarActiveTintColor: "#7dd3fc",
         }}
       />
+
       <Tabs.Screen
-        name="explore"
+        name="routine"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "Routine",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="list" size={28} color={color} />
+          ),
+          tabBarActiveTintColor: "#f9a8d4",
+        }}
+      />
+
+      <Tabs.Screen
+        name="feelings"
+        options={{
+          title: "Feelings",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="happy" size={28} color={color} />
+          ),
+          tabBarActiveTintColor: "#facc15",
+        }}
+      />
+
+      <Tabs.Screen
+        name="calm"
+        options={{
+          title: "Calm Corner",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="leaf" size={28} color={color} />
+          ),
+          tabBarActiveTintColor: "#a7f3d0",
+        }}
+      />
+
+      <Tabs.Screen
+        name="rewards"
+        options={{
+          title: "Rewards",
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="star" size={28} color={color} />
+          ),
+          tabBarActiveTintColor: "#fcd34d",
         }}
       />
     </Tabs>

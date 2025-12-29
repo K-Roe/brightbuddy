@@ -46,22 +46,30 @@ export default function Calm() {
       ? feelingTheme[feeling]
       : { bg: "#EAF6FF", text: "Let’s slow down together", defaultMode: "calm", accent: "#2D4A8C" };
 
-  /* ---------------- LOAD FEELING ---------------- */
+  /* ---------------- LOAD FEELING (NOW ALWAYS WORKS) ---------------- */
+  const loadFeeling = async () => {
+    const stored = await AsyncStorage.getItem("childFeelings");
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored);
+      const value = parsed?.value ?? parsed;
+
+      setFeeling(value);
+      setMode(feelingTheme[value]?.defaultMode ?? "calm");
+    } catch {
+      setFeeling(stored);
+      setMode(feelingTheme[stored]?.defaultMode ?? "calm");
+    }
+  };
+
+  // Load once when screen mounts
   useEffect(() => {
-    const loadFeeling = async () => {
-      const stored = await AsyncStorage.getItem("childFeelings");
-      if (!stored) return;
+    loadFeeling();
+  }, []);
 
-      try {
-        const parsed = JSON.parse(stored);
-        setFeeling(parsed.value ?? parsed);
-        setMode(parsed.value ? feelingTheme[parsed.value]?.defaultMode : "calm");
-      } catch {
-        setFeeling(stored);
-        setMode(feelingTheme[stored]?.defaultMode ?? "calm");
-      }
-    };
-
+  // Load again when screen regains focus
+  useEffect(() => {
     if (isFocused) loadFeeling();
   }, [isFocused]);
 
@@ -266,7 +274,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingTop: 40,
-    paddingBottom: 100, // guaranteed safe space above nav bar
+    paddingBottom: 100,
     justifyContent: "space-between",
   },
 
@@ -307,6 +315,4 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   exitText: { fontSize: 16, fontWeight: "800", color: "#2B7A3F" },
-
-  footer: { marginTop: 4, color: "#666", fontSize: 14 },
 });

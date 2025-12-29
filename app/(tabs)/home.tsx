@@ -1,12 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect } from "expo-router";
 import * as Speech from "expo-speech";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import ThemedAlert from "../../components/ThemedAlert";
 import { useThemedAlert } from "../hooks/useThemedAlert";
 
 export default function Home() {
   const [feelings, setFeelings] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
 
   const { alertVisible, alertTitle, alertMsg, showAlert, hideAlert } =
     useThemedAlert();
@@ -22,33 +24,51 @@ export default function Home() {
     }
   };
 
+  /* ---------------- LOAD FEELINGS + PROGRESS ---------------- */
+  useFocusEffect(
+    useCallback(() => {
+      const load = async () => {
+        // Routine Progress
+        const data = await AsyncStorage.getItem("routineProgress");
+        if (data) setProgress(JSON.parse(data));
+
+        // Saved Feeling
+        const savedFeeling = await AsyncStorage.getItem("childFeelings");
+        if (savedFeeling) setFeelings(savedFeeling);
+      };
+
+      load();
+    }, [])
+  );
+
+  /* ---------------- FEELING COLORS ---------------- */
   const feelingColors: Record<string, string> = {
-  Happy: "#FFF3B0",        // soft yellow
-  Okay: "#E0ECFF",         // gentle blue
-  Sad: "#CFE4FF",          // cool blue
-  Angry: "#FFD6D6",        // soft red/pink
-  Overwhelmed: "#EAD9FF",  // soft purple
-};
+    Happy: "#FFF3B0",
+    Okay: "#E0ECFF",
+    Sad: "#CFE4FF",
+    Angry: "#FFD6D6",
+    Overwhelmed: "#EAD9FF",
+  };
 
-const speechSettings: Record<string, { rate: number; pitch: number }> = {
-  Happy: { rate: 1.1, pitch: 1.2 },
-  Okay: { rate: 1.0, pitch: 1.0 },
-  Sad: { rate: 0.85, pitch: 0.9 },
-  Angry: { rate: 0.9, pitch: 0.9 },
-  Overwhelmed: { rate: 0.8, pitch: 0.95 },
-};
+  const speechSettings: Record<string, { rate: number; pitch: number }> = {
+    Happy: { rate: 1.1, pitch: 1.2 },
+    Okay: { rate: 1.0, pitch: 1.0 },
+    Sad: { rate: 0.85, pitch: 0.9 },
+    Angry: { rate: 0.9, pitch: 0.9 },
+    Overwhelmed: { rate: 0.8, pitch: 0.95 },
+  };
 
-const currentColor = feelings ? feelingColors[feelings] : "#DFF7EE";
+  const currentColor = feelings ? feelingColors[feelings] : "#DFF7EE";
 
+  /* ---------------- SPEAK ---------------- */
+  const speakTheFeeling = (value: string) => {
+    const settings = speechSettings[value] || { rate: 1.0, pitch: 1.0 };
 
-const speakTheFeeling = (value: string) => {
-  const settings = speechSettings[value] || { rate: 1.0, pitch: 1.0 };
-
-  Speech.speak(`You have said you feel ${value}`, {
-    rate: settings.rate,
-    pitch: settings.pitch,
-  });
-};
+    Speech.speak(`You have said you feel ${value}`, {
+      rate: settings.rate,
+      pitch: settings.pitch,
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -59,8 +79,6 @@ const speakTheFeeling = (value: string) => {
           You're safe here. Let’s take today gently.
         </Text>
       </View>
-
-
 
       {/* Feelings Check-in */}
       <View style={styles.section}>
@@ -77,25 +95,73 @@ const speakTheFeeling = (value: string) => {
 
       {/* Feelings Corner */}
       {feelings && (
-      <TouchableOpacity style={[styles.feelingCard, { backgroundColor: currentColor }]}>
-        <Text style={styles.feelingTitle}>
-          You have said you feel {feelings}.
-        </Text>
-        <Text style={styles.feelingText}>
-          That’s okay. I’m here with you 💛
-        </Text>
-      </TouchableOpacity>
-    )}
-
+        <TouchableOpacity
+          style={[styles.feelingCard, { backgroundColor: currentColor }]}
+        >
+          <Text style={styles.feelingTitle}>
+            You have said you feel {feelings}.
+          </Text>
+          <Text style={styles.feelingText}>
+            That’s okay. I’m here with you 💛
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Calm Corner */}
-      <TouchableOpacity style={styles.calmCard}>
+      <TouchableOpacity
+        style={styles.calmCard}
+        onPress={() => {
+          router.push("/(tabs)/calm");
+        }}
+      >
         <Text style={styles.calmTitle}>Need a quiet moment?</Text>
         <Text style={styles.calmText}>Tap here to relax and feel calm 🧘</Text>
       </TouchableOpacity>
 
-        {/* Start My Day */}
-      <TouchableOpacity style={styles.primaryButton}>
+      {/* Routine Progress */}
+      <TouchableOpacity
+        style={[
+          styles.routineCard,
+          progress
+            ? progress.completed === progress.total
+              ? styles.cardDone
+              : progress.completed >= Math.ceil(progress.total / 2)
+                ? styles.cardMid
+                : styles.cardStart
+            : styles.cardNeutral
+        ]}
+        onPress={() => {
+          router.push("/(tabs)/routine");
+        }}
+      >
+        <Text style={styles.routineTitle}>Routine Progress</Text>
+
+        {progress ? (
+          progress.completed === progress.total ? (
+            <Text style={styles.routineText}>
+              Amazing job! You finished everything today 🎉🌟
+            </Text>
+          ) : (
+            <Text style={styles.routineText}>
+              Completed {progress.completed} / {progress.total} 🎯{"\n"}
+              You are doing great! Keep going!
+            </Text>
+          )
+        ) : (
+          <Text style={styles.routineText}>
+            Tap here to see your routine progress 📊
+          </Text>
+        )}
+      </TouchableOpacity>
+
+
+      {/* Start My Day */}
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => {
+          router.push("/(tabs)/routine");
+        }}
+      >
         <Text style={styles.primaryButtonText}>Start My Day</Text>
       </TouchableOpacity>
 
@@ -131,6 +197,7 @@ function Feeling({
   );
 }
 
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -139,7 +206,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
 
-  // Welcome
   welcomeBox: {
     alignItems: "center",
     marginBottom: 25,
@@ -156,7 +222,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Primary CTA
   primaryButton: {
     backgroundColor: "#4F46E5",
     paddingVertical: 18,
@@ -173,7 +238,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // Section
   section: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -189,7 +253,6 @@ const styles = StyleSheet.create({
     color: "#3F3D56",
   },
 
-  // Feelings Row
   feelingsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -207,13 +270,11 @@ const styles = StyleSheet.create({
     color: "#444",
   },
 
-  // Calm Corner
   calmCard: {
     backgroundColor: "#DFF7EE",
     borderRadius: 20,
     padding: 18,
     marginBottom: 20,
-
   },
   calmTitle: {
     fontSize: 18,
@@ -225,9 +286,7 @@ const styles = StyleSheet.create({
     color: "#126B4E",
   },
 
-    // feeling Corner
   feelingCard: {
-    backgroundColor: "#DFF7EE",
     borderRadius: 20,
     padding: 18,
     marginBottom: 20,
@@ -240,5 +299,37 @@ const styles = StyleSheet.create({
   feelingText: {
     marginTop: 6,
     color: "#126B4E",
+  },
+
+  routineCard: {
+    backgroundColor: "#DFF7EE",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+  },
+  routineTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0B7A55",
+  },
+  routineText: {
+    marginTop: 6,
+    color: "#126B4E",
+  },
+
+  cardNeutral: {
+    backgroundColor: "#DFF7EE",
+  },
+
+  cardStart: {
+    backgroundColor: "#BFDBFE",
+  },
+
+  cardMid: {
+    backgroundColor: "#FDE68A",
+  },
+
+  cardDone: {
+    backgroundColor: "#A7F3D0",
   },
 });

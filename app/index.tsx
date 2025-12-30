@@ -1,7 +1,19 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function Index() {
+    const handleParentAccess = async () => {
+    const pin = await AsyncStorage.getItem("parentPin");
+
+    if (!pin) {
+      // No PIN set yet – first time setup
+      router.push("/pin-setup");
+    } else {
+      // PIN exists – ask them to enter
+      router.push("/pin-login");
+    }
+  };
 
 
   return (
@@ -9,7 +21,8 @@ export default function Index() {
 
 
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onLongPress={handleParentAccess}>
+         <Text style={styles.tagline}>Hold Finger on title to access parent settings</Text>
           <Text style={styles.appName}>BrightBuddy</Text>
         </TouchableOpacity>
 

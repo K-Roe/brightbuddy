@@ -1,10 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import RoutineItem from "../../components/RoutineItem";
 
 export default function Routine() {
-  const routineItems = [
+  const defaultItems = [
     "Wake Up and Stretch",
     "Brush Teeth",
     "Get Dressed",
@@ -13,9 +13,54 @@ export default function Routine() {
     "Review Daily Goals",
   ];
 
-  const [completed, setCompleted] = useState(
-    new Array(routineItems.length).fill(false)
+  const [routineItems, setRoutineItems] = useState<string[]>(defaultItems);
+  const [completed, setCompleted] = useState<boolean[]>(
+    new Array(defaultItems.length).fill(false)
   );
+
+  const today = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    loadItemsAndProgress();
+  }, []);
+
+  const loadItemsAndProgress = async () => {
+    try {
+      const savedItems = await AsyncStorage.getItem("routineItems");
+      let items = defaultItems;
+
+      if (savedItems) {
+        items = JSON.parse(savedItems);
+        setRoutineItems(items);
+      } else {
+        setRoutineItems(defaultItems);
+      }
+
+      const data = await AsyncStorage.getItem("routineProgress");
+      if (!data) {
+        setCompleted(new Array(items.length).fill(false));
+        return;
+      }
+
+      const parsed = JSON.parse(data);
+
+      if (parsed.date !== today) {
+        await AsyncStorage.removeItem("routineProgress");
+        setCompleted(new Array(items.length).fill(false));
+        return;
+      }
+
+      if (!parsed.items || parsed.items.length !== items.length) {
+        await AsyncStorage.removeItem("routineProgress");
+        setCompleted(new Array(items.length).fill(false));
+        return;
+      }
+
+      setCompleted(parsed.items);
+    } catch (e) {
+      console.log("Failed to load routine items/progress", e);
+    }
+  };
 
   const updateStatus = async (index: number, done: boolean) => {
     const copy = [...completed];
@@ -24,10 +69,11 @@ export default function Routine() {
 
     const totalDone = copy.filter(Boolean).length;
 
-    // save to storage
     await AsyncStorage.setItem(
       "routineProgress",
       JSON.stringify({
+        date: today,
+        items: copy,
         completed: totalDone,
         total: routineItems.length,
       })
@@ -35,7 +81,10 @@ export default function Routine() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.welcomeBox}>
         <Text style={styles.title}>Routine 😊</Text>
         <Text style={styles.subText}>
@@ -47,20 +96,20 @@ export default function Routine() {
         <RoutineItem
           key={index}
           label={item}
+          defaultCompleted={completed[index]}
           onStatusChange={(done) => updateStatus(index, done)}
         />
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 40,
+    paddingBottom: 80,
   },
-
   welcomeBox: {
     alignItems: "center",
     marginBottom: 25,

@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
 import * as Speech from "expo-speech";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import ThemedAlert from "../../components/ThemedAlert";
 import { useThemedAlert } from "../hooks/useThemedAlert";
@@ -10,15 +10,43 @@ export default function Home() {
   const [feelings, setFeelings] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
 
+  const today = new Date().toISOString().split("T")[0];
+
+  const tapCount = useRef(0);
+  const resetTimer = useRef<NodeJS.Timeout | null>(null);
+
   const { alertVisible, alertTitle, alertMsg, showAlert, hideAlert } =
     useThemedAlert();
+
+  /* ---------------- TRIPLE TAP HANDLER ---------------- */
+  const handleSecretBack = () => {
+    tapCount.current += 1;
+
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+
+    resetTimer.current = setTimeout(() => {
+      tapCount.current = 0;
+    }, 2000);
+
+    if (tapCount.current >= 3) {
+      tapCount.current = 0;
+      router.back();
+    }
+  };
 
   /* ---------------- SAVE FEELINGS ---------------- */
   const saveFeelings = async (value: string) => {
     try {
       setFeelings(value);
       speakTheFeeling(value);
-      await AsyncStorage.setItem("childFeelings", value);
+
+      await AsyncStorage.setItem(
+        "childFeelings",
+        JSON.stringify({
+          value,
+          date: today,
+        })
+      );
     } catch (e) {
       showAlert("Error", "Failed to save your feelings. Please try again.");
     }
@@ -28,13 +56,31 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       const load = async () => {
-        // Routine Progress
+        /* ---------- Routine Progress ---------- */
         const data = await AsyncStorage.getItem("routineProgress");
-        if (data) setProgress(JSON.parse(data));
+        if (data) {
+          const parsed = JSON.parse(data);
 
-        // Saved Feeling
+          if (parsed.date !== today) {
+            await AsyncStorage.removeItem("routineProgress");
+            setProgress(null);
+          } else {
+            setProgress({ completed: parsed.completed, total: parsed.total });
+          }
+        }
+
+        /* ---------- Feelings ---------- */
         const savedFeeling = await AsyncStorage.getItem("childFeelings");
-        if (savedFeeling) setFeelings(savedFeeling);
+        if (savedFeeling) {
+          const parsed = JSON.parse(savedFeeling);
+
+          if (parsed.date !== today) {
+            await AsyncStorage.removeItem("childFeelings");
+            setFeelings(null);
+          } else {
+            setFeelings(parsed.value);
+          }
+        }
       };
 
       load();
@@ -75,6 +121,14 @@ export default function Home() {
       {/* Welcome */}
       <View style={styles.welcomeBox}>
         <Text style={styles.title}>Hi there 😊</Text>
+
+        {/* Invisible Triple-Tap Parent Escape */}
+        <TouchableOpacity
+          style={styles.hiddenBack}
+          onPress={handleSecretBack}
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+        />
+
         <Text style={styles.subText}>
           You're safe here. Let’s take today gently.
         </Text>
@@ -110,9 +164,7 @@ export default function Home() {
       {/* Calm Corner */}
       <TouchableOpacity
         style={styles.calmCard}
-        onPress={() => {
-          router.push("/(tabs)/calm");
-        }}
+        onPress={() => router.push("/(tabs)/calm")}
       >
         <Text style={styles.calmTitle}>Need a quiet moment?</Text>
         <Text style={styles.calmText}>Tap here to relax and feel calm 🧘</Text>
@@ -130,9 +182,7 @@ export default function Home() {
                 : styles.cardStart
             : styles.cardNeutral
         ]}
-        onPress={() => {
-          router.push("/(tabs)/routine");
-        }}
+        onPress={() => router.push("/(tabs)/routine")}
       >
         <Text style={styles.routineTitle}>Routine Progress</Text>
 
@@ -154,13 +204,10 @@ export default function Home() {
         )}
       </TouchableOpacity>
 
-
       {/* Start My Day */}
       <TouchableOpacity
         style={styles.primaryButton}
-        onPress={() => {
-          router.push("/(tabs)/routine");
-        }}
+        onPress={() => router.push("/(tabs)/routine")}
       >
         <Text style={styles.primaryButtonText}>Start My Day</Text>
       </TouchableOpacity>
@@ -215,6 +262,16 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: "#4F46E5",
   },
+
+  hiddenBack: {
+    position: "absolute",
+    right: 10,
+    top: 5,
+    width: 60,
+    height: 60,
+    opacity: 0, // invisible but clickable
+  },
+
   subText: {
     marginTop: 8,
     fontSize: 16,
@@ -257,18 +314,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  feelingItem: {
-    alignItems: "center",
-    width: 60,
-  },
-  feelingEmoji: {
-    fontSize: 30,
-  },
-  feelingLabel: {
-    fontSize: 12,
-    marginTop: 4,
-    color: "#444",
-  },
+  feelingItem: { alignItems: "center", width: 60 },
+  feelingEmoji: { fontSize: 30 },
+  feelingLabel: { fontSize: 12, marginTop: 4, color: "#444" },
 
   calmCard: {
     backgroundColor: "#DFF7EE",
@@ -276,30 +324,12 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 20,
   },
-  calmTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0B7A55",
-  },
-  calmText: {
-    marginTop: 6,
-    color: "#126B4E",
-  },
+  calmTitle: { fontSize: 18, fontWeight: "800", color: "#0B7A55" },
+  calmText: { marginTop: 6, color: "#126B4E" },
 
-  feelingCard: {
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 20,
-  },
-  feelingTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0B7A55",
-  },
-  feelingText: {
-    marginTop: 6,
-    color: "#126B4E",
-  },
+  feelingCard: { borderRadius: 20, padding: 18, marginBottom: 20 },
+  feelingTitle: { fontSize: 18, fontWeight: "800", color: "#0B7A55" },
+  feelingText: { marginTop: 6, color: "#126B4E" },
 
   routineCard: {
     backgroundColor: "#DFF7EE",
@@ -307,29 +337,11 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 20,
   },
-  routineTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0B7A55",
-  },
-  routineText: {
-    marginTop: 6,
-    color: "#126B4E",
-  },
+  routineTitle: { fontSize: 18, fontWeight: "800", color: "#0B7A55" },
+  routineText: { marginTop: 6, color: "#126B4E" },
 
-  cardNeutral: {
-    backgroundColor: "#DFF7EE",
-  },
-
-  cardStart: {
-    backgroundColor: "#BFDBFE",
-  },
-
-  cardMid: {
-    backgroundColor: "#FDE68A",
-  },
-
-  cardDone: {
-    backgroundColor: "#A7F3D0",
-  },
+  cardNeutral: { backgroundColor: "#DFF7EE" },
+  cardStart: { backgroundColor: "#BFDBFE" },
+  cardMid: { backgroundColor: "#FDE68A" },
+  cardDone: { backgroundColor: "#A7F3D0" },
 });
